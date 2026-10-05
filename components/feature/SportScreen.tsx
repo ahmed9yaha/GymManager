@@ -9,6 +9,7 @@ import {
   FlatList,
   Pressable,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize } from '@/constants/theme';
@@ -28,11 +29,19 @@ interface SportScreenProps {
 }
 
 export function SportScreen({ sport, label, color, dimColor, icon }: SportScreenProps) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { members, addMemberToSport, removeMember, getStats } = useGym();
   const { showAlert } = useAlert();
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
+
+  const navigateToFiltered = useCallback(
+    (filter: 'all' | 'expiring' | 'expired') => {
+      router.push({ pathname: '/filtered-members', params: { sport, filter } });
+    },
+    [router, sport]
+  );
 
   const sportMembers = members[sport];
   const stats = getStats(sport);
@@ -84,6 +93,7 @@ export function SportScreen({ sport, label, color, dimColor, icon }: SportScreen
           color={Colors.statBlue}
           dimColor={Colors.statBlueDim}
           iconName="people"
+          onPress={() => navigateToFiltered('all')}
         />
         <StatsCard
           label="ينتهي قريباً"
@@ -91,6 +101,7 @@ export function SportScreen({ sport, label, color, dimColor, icon }: SportScreen
           color={Colors.statYellow}
           dimColor={Colors.statYellowDim}
           iconName="schedule"
+          onPress={() => navigateToFiltered('expiring')}
         />
         <StatsCard
           label="منتهي الاشتراك"
@@ -98,6 +109,7 @@ export function SportScreen({ sport, label, color, dimColor, icon }: SportScreen
           color={Colors.statRed}
           dimColor={Colors.statRedDim}
           iconName="event-busy"
+          onPress={() => navigateToFiltered('expired')}
         />
       </View>
 

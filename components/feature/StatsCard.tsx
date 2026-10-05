@@ -1,6 +1,6 @@
 // Powered by OnSpace.AI
 import React, { memo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, FontSize } from '@/constants/theme';
 
@@ -10,17 +10,32 @@ interface StatsCardProps {
   color: string;
   dimColor: string;
   iconName: keyof typeof MaterialIcons.glyphMap;
+  onPress?: () => void;
 }
 
-export const StatsCard = memo(({ label, value, color, dimColor, iconName }: StatsCardProps) => {
+export const StatsCard = memo(({ label, value, color, dimColor, iconName, onPress }: StatsCardProps) => {
   return (
-    <View style={[styles.card, { backgroundColor: dimColor, borderColor: color + '40' }]}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: dimColor, borderColor: color + '40' },
+        onPress && pressed && { opacity: 0.75, transform: [{ scale: 0.97 }] },
+      ]}
+      onPress={onPress}
+      disabled={!onPress}
+    >
       <View style={[styles.iconCircle, { backgroundColor: color + '25' }]}>
         <MaterialIcons name={iconName} size={22} color={color} />
       </View>
       <Text style={[styles.value, { color }]}>{value}</Text>
       <Text style={styles.label}>{label}</Text>
-    </View>
+      {onPress ? (
+        <View style={[styles.tapHint, { backgroundColor: color + '20' }]}>
+          <MaterialIcons name="chevron-left" size={12} color={color} />
+          <Text style={[styles.tapHintText, { color }]}>عرض</Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 });
 
@@ -32,6 +47,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     marginHorizontal: Spacing.xs,
+  },
+  tapHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 5,
+    gap: 1,
+  },
+  tapHintText: {
+    fontSize: 9,
+    fontWeight: '700',
   },
   iconCircle: {
     width: 44,

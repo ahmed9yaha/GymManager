@@ -13,6 +13,13 @@ export default function RootLayout() {
           <StatusBar style="light" />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="filtered-members"
+              options={{
+                headerShown: false,
+                animation: 'slide_from_left',
+              }}
+            />
           </Stack>
         </GymProvider>
       </SafeAreaProvider>
