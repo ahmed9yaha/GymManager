@@ -3,6 +3,7 @@ import { AlertProvider } from '@/template';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { GymProvider } from '@/contexts/GymContext';
+import { TableGamesProvider } from '@/contexts/TableGamesContext';
 import { StatusBar } from 'expo-status-bar';
 
 export default function RootLayout() {
@@ -10,6 +11,7 @@ export default function RootLayout() {
     <AlertProvider>
       <SafeAreaProvider>
         <GymProvider>
+          <TableGamesProvider>
           <StatusBar style="light" />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -21,6 +23,7 @@ export default function RootLayout() {
               }}
             />
           </Stack>
+          </TableGamesProvider>
         </GymProvider>
       </SafeAreaProvider>
     </AlertProvider>

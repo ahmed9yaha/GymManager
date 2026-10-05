@@ -81,6 +81,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="other-games"
+        options={{
+          title: 'ألعاب أخرى',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="sports-esports" size={size} color={color} />
+          ),
+          tabBarActiveTintColor: '#F97316',
+        }}
+      />
+      <Tabs.Screen
         name="reports"
         options={{
           title: 'التقارير',

@@ -1,0 +1,119 @@
+// Powered by OnSpace.AI
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export type GameType = 'billiards' | 'tabletennis';
+export type SessionMode = '1h' | '2h' | '3h' | 'open';
+
+export interface TableSession {
+  id: string;
+  tableId: string;
+  tableNumber: number;
+  gameType: GameType;
+  mode: SessionMode;
+  startTime: string; // ISO
+  durationMinutes: number; // 0 for open
+  hourlyRate: number;
+  endTime?: string; // ISO, set when stopped
+  isActive: boolean;
+  notifId?: string;
+}
+
+export interface GameSettings {
+  billiards: {
+    hourlyRate: number;
+    tableCount: number;
+    customSoundUri?: string;
+  };
+  tabletennis: {
+    hourlyRate: number;
+    tableCount: number;
+    customSoundUri?: string;
+  };
+}
+
+const KEYS = {
+  sessions: 'table_games_sessions',
+  settings: 'table_games_settings',
+};
+
+const DEFAULT_SETTINGS: GameSettings = {
+  billiards: { hourlyRate: 1000, tableCount: 4 },
+  tabletennis: { hourlyRate: 500, tableCount: 3 },
+};
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+export async function loadSettings(): Promise<GameSettings> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.settings);
+    if (!raw) return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export async function saveSettings(settings: GameSettings): Promise<void> {
+  await AsyncStorage.setItem(KEYS.settings, JSON.stringify(settings));
+}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+
+export async function loadSessions(): Promise<TableSession[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.sessions);
+    if (!raw) return [];
+    return JSON.parse(raw) as TableSession[];
+  } catch {
+    return [];
+  }
+}
+
+export async function persistSessions(sessions: TableSession[]): Promise<void> {
+  await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(sessions));
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+export function modeDuration(mode: SessionMode): number {
+  if (mode === '1h') return 60;
+  if (mode === '2h') return 120;
+  if (mode === '3h') return 180;
+  return 0; // open
+}
+
+export function modeLabel(mode: SessionMode): string {
+  if (mode === '1h') return 'ساعة';
+  if (mode === '2h') return 'ساعتان';
+  if (mode === '3h') return '٣ ساعات';
+  return 'وقت مفتوح';
+}
+
+export function calcCost(session: TableSession, nowMs: number): number {
+  const startMs = new Date(session.startTime).getTime();
+  const elapsedMinutes = Math.max(0, (nowMs - startMs) / 60000);
+  if (session.mode === 'open') {
+    return Math.ceil((elapsedMinutes / 60) * session.hourlyRate);
+  }
+  return Math.ceil((session.durationMinutes / 60) * session.hourlyRate);
+}
+
+export function calcRemainingSeconds(session: TableSession, nowMs: number): number {
+  if (session.mode === 'open') return -1;
+  const startMs = new Date(session.startTime).getTime();
+  const endMs = startMs + session.durationMinutes * 60 * 1000;
+  return Math.max(0, Math.ceil((endMs - nowMs) / 1000));
+}
+
+export function calcElapsedSeconds(session: TableSession, nowMs: number): number {
+  const startMs = new Date(session.startTime).getTime();
+  return Math.floor((nowMs - startMs) / 1000);
+}
+
+export function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
