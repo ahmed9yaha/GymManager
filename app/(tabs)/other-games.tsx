@@ -17,11 +17,6 @@ import { TableSettingsModal } from '@/components/feature/TableSettingsModal';
 import { SessionMode, GameType, GameSettings } from '@/services/tableGames';
 import { useAlert } from '@/template';
 
-const BILLIARDS_COLOR = '#F97316';
-const BILLIARDS_DIM = '#2A1500';
-const TT_COLOR = '#06B6D4';
-const TT_DIM = '#001A20';
-
 export default function OtherGamesScreen() {
   const insets = useSafeAreaInsets();
   const { sessions, settings, tick, startSession, stopSession, getActiveSession, updateSettings } = useTableGames();
@@ -352,8 +347,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
-const BILLIARDS_COLOR = '#F97316';
-const BILLIARDS_DIM = '#2A1500';
-const TT_COLOR = '#06B6D4';
-const TT_DIM = '#001A20';
