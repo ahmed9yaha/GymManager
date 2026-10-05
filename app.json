@@ -23,11 +23,6 @@
       },
       "package": "com.gymmanager.app"
     },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/icon.png"
-    },
     "plugins": [
       "expo-router",
       [
