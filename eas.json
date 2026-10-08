@@ -1,7 +1,6 @@
 {
   "cli": {
-    "version": ">= 12.0.0",
-    "frozenLockfile": false
+    "version": ">= 12.0.0"
   },
   "build": {
     "development": {
