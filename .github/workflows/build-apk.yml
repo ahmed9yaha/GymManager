@@ -27,6 +27,11 @@ jobs:
         run: |
           eas init --account ahmed9yaha --non-interactive || true
 
+      - name: Clean and Fix Project Files
+        run: |
+          rm -rf android
+          npx expo prebuild --platform android --clean
+
       - name: Build APK on Expo Cloud
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
