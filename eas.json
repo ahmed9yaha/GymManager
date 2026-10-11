@@ -10,10 +10,6 @@
     "preview": {
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EAS_NO_FROZEN_LOCKFILE": "1",
-        "EXPO_NO_METRO_HEALTH_CHECK": "1"
       }
     },
     "production": {}
