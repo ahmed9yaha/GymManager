@@ -32,8 +32,8 @@ export interface GameSettings {
 }
 
 const KEYS = {
-  sessions: 'table_games_sessions',
-  settings: 'table_games_settings',
+  sessions: 'table_games_sessions_v2',
+  settings: 'table_games_settings_v2',
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -47,14 +47,20 @@ export async function loadSettings(): Promise<GameSettings> {
   try {
     const raw = await AsyncStorage.getItem(KEYS.settings);
     if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      billiards: { ...DEFAULT_SETTINGS.billiards, ...parsed.billiards },
+      tabletennis: { ...DEFAULT_SETTINGS.tabletennis, ...parsed.tabletennis },
+    };
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
 export async function saveSettings(settings: GameSettings): Promise<void> {
-  await AsyncStorage.setItem(KEYS.settings, JSON.stringify(settings));
+  try {
+    await AsyncStorage.setItem(KEYS.settings, JSON.stringify(settings));
+  } catch {}
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
@@ -70,7 +76,9 @@ export async function loadSessions(): Promise<TableSession[]> {
 }
 
 export async function persistSessions(sessions: TableSession[]): Promise<void> {
-  await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(sessions));
+  try {
+    await AsyncStorage.setItem(KEYS.sessions, JSON.stringify(sessions));
+  } catch {}
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -111,9 +119,12 @@ export function calcElapsedSeconds(session: TableSession, nowMs: number): number
 }
 
 export function formatDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  const absSeconds = Math.abs(totalSeconds);
+  const h = Math.floor(absSeconds / 3600);
+  const m = Math.floor((absSeconds % 3600) / 60);
+  const s = absSeconds % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }

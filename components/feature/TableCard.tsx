@@ -26,12 +26,23 @@ interface TableCardProps {
 }
 
 export const TableCard = memo(
-  ({ tableId, tableNumber, gameType, color, dimColor, icon, activeSession, tick, onPress, onStop }: TableCardProps) => {
+  ({
+    tableId,
+    tableNumber,
+    gameType,
+    color,
+    dimColor,
+    icon,
+    activeSession,
+    tick,
+    onPress,
+    onStop,
+  }: TableCardProps) => {
     const now = Date.now();
     const isActive = !!activeSession;
 
-    let timerDisplay = '';
-    let costDisplay = '';
+    let timerDisplay = '--:--';
+    let costDisplay = '0 ر.ي';
     let isExpired = false;
 
     if (isActive && activeSession) {
@@ -48,26 +59,90 @@ export const TableCard = memo(
       }
     }
 
+    const borderColor = isExpired
+      ? Colors.danger + '80'
+      : isActive
+      ? color + '60'
+      : Colors.border;
+
+    const bgColor = isExpired
+      ? Colors.statRedDim
+      : isActive
+      ? dimColor
+      : Colors.card;
+
     return (
-      <View style={[styles.card, { borderColor: isActive ? color + '60' : Colors.border, backgroundColor: isActive ? dimColor : Colors.card }]}>
+      <View style={[styles.card, { borderColor, backgroundColor: bgColor }]}>
         {/* Status strip */}
-        <View style={[styles.strip, { backgroundColor: isExpired ? Colors.danger : isActive ? color : Colors.border }]} />
+        <View
+          style={[
+            styles.strip,
+            {
+              backgroundColor: isExpired
+                ? Colors.danger
+                : isActive
+                ? color
+                : Colors.border,
+            },
+          ]}
+        />
 
         <View style={styles.body}>
           {/* Table header */}
           <View style={styles.topRow}>
-            <View style={[styles.iconWrap, { backgroundColor: color + '20' }]}>
+            <View style={[styles.iconWrap, { backgroundColor: color + '25' }]}>
               <MaterialIcons name={icon} size={22} color={color} />
             </View>
             <View style={styles.titleBlock}>
               <Text style={styles.tableName}>طاولة {tableNumber}</Text>
-              <View style={[styles.statusBadge, {
-                backgroundColor: isExpired ? Colors.statRedDim : isActive ? color + '20' : Colors.surface,
-                borderColor: isExpired ? Colors.danger + '50' : isActive ? color + '40' : Colors.border,
-              }]}>
-                <View style={[styles.dot, { backgroundColor: isExpired ? Colors.danger : isActive ? color : Colors.textMuted }]} />
-                <Text style={[styles.statusLabel, { color: isExpired ? Colors.danger : isActive ? color : Colors.textMuted }]}>
-                  {isExpired ? 'انتهى الوقت!' : isActive ? (activeSession!.mode === 'open' ? 'وقت مفتوح' : modeLabel(activeSession!.mode)) : 'متاحة'}
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor: isExpired
+                      ? Colors.statRedDim
+                      : isActive
+                      ? color + '20'
+                      : Colors.surface,
+                    borderColor: isExpired
+                      ? Colors.danger + '50'
+                      : isActive
+                      ? color + '40'
+                      : Colors.border,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: isExpired
+                        ? Colors.danger
+                        : isActive
+                        ? color
+                        : Colors.textMuted,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.statusLabel,
+                    {
+                      color: isExpired
+                        ? Colors.danger
+                        : isActive
+                        ? color
+                        : Colors.textMuted,
+                    },
+                  ]}
+                >
+                  {isExpired
+                    ? 'انتهى الوقت!'
+                    : isActive
+                    ? activeSession!.mode === 'open'
+                      ? 'وقت مفتوح'
+                      : modeLabel(activeSession!.mode)
+                    : 'متاحة'}
                 </Text>
               </View>
             </View>
@@ -79,18 +154,29 @@ export const TableCard = memo(
               <Text style={[styles.timerLabel, { color: Colors.textMuted }]}>
                 {activeSession!.mode === 'open' ? 'الوقت المستهلك' : 'الوقت المتبقي'}
               </Text>
-              <Text style={[styles.timer, {
-                color: isExpired ? Colors.danger : activeSession!.mode === 'open' ? color : Colors.textPrimary,
-              }]}>
+              <Text
+                style={[
+                  styles.timer,
+                  {
+                    color: isExpired
+                      ? Colors.danger
+                      : activeSession!.mode === 'open'
+                      ? color
+                      : Colors.textPrimary,
+                  },
+                ]}
+              >
                 {timerDisplay}
               </Text>
               <View style={styles.costRow}>
                 <MaterialIcons name="payments" size={14} color={Colors.reports} />
-                <Text style={[styles.costText, { color: Colors.reports }]}>{costDisplay}</Text>
+                <Text style={[styles.costText, { color: Colors.reports }]}>
+                  {costDisplay}
+                </Text>
               </View>
             </View>
           ) : (
-            <Text style={styles.availableText}>اضغط لبدء جلسة</Text>
+            <Text style={styles.availableText}>اضغط لبدء جلسة جديدة</Text>
           )}
 
           {/* Action buttons */}
@@ -98,9 +184,10 @@ export const TableCard = memo(
             <Pressable
               style={({ pressed }) => [
                 styles.startBtn,
-                { backgroundColor: isActive ? Colors.statBlueDim : color, borderColor: isActive ? Colors.statBlue + '40' : color },
+                isActive
+                  ? { backgroundColor: Colors.statBlueDim, borderColor: Colors.statBlue + '40', flex: 0.48 }
+                  : { backgroundColor: color, borderColor: color, flex: 1 },
                 pressed && { opacity: 0.8 },
-                isActive && { flex: 0.48 },
               ]}
               onPress={onPress}
             >
@@ -109,7 +196,12 @@ export const TableCard = memo(
                 size={16}
                 color={isActive ? Colors.statBlue : Colors.white}
               />
-              <Text style={[styles.btnText, { color: isActive ? Colors.statBlue : Colors.white }]}>
+              <Text
+                style={[
+                  styles.btnText,
+                  { color: isActive ? Colors.statBlue : Colors.white },
+                ]}
+              >
                 {isActive ? 'تعديل' : 'بدء الجلسة'}
               </Text>
             </Pressable>
@@ -201,10 +293,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   timer: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '800',
     letterSpacing: 2,
-    fontVariant: ['tabular-nums'],
   },
   costRow: {
     flexDirection: 'row',
@@ -227,7 +318,6 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   startBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -46,11 +46,12 @@ export function TableSessionModal({
   const [selected, setSelected] = useState<SessionMode | null>(null);
   const [customRate, setCustomRate] = useState('');
 
-  const effectiveRate = customRate && !isNaN(Number(customRate)) && Number(customRate) > 0
-    ? Number(customRate)
-    : hourlyRate;
+  const effectiveRate =
+    customRate && !isNaN(Number(customRate)) && Number(customRate) > 0
+      ? Number(customRate)
+      : hourlyRate;
 
-  const calcPreviewCost = (mode: SessionMode) => {
+  const calcPreviewCost = (mode: SessionMode): number | null => {
     if (mode === 'open') return null;
     const mins = modeDuration(mode);
     return Math.ceil((mins / 60) * effectiveRate);
@@ -79,7 +80,7 @@ export function TableSessionModal({
           style={styles.avoidWrap}
         >
           <Pressable style={styles.sheet} onPress={() => {}}>
-            {/* Header strip */}
+            {/* Color strip */}
             <View style={[styles.strip, { backgroundColor: color }]} />
 
             <View style={styles.header}>
@@ -89,7 +90,11 @@ export function TableSessionModal({
                   {gameLabel} — طاولة {tableNumber}
                 </Text>
               </View>
-              <Pressable onPress={handleClose} style={styles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Pressable
+                onPress={handleClose}
+                style={styles.closeBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
               </Pressable>
             </View>
@@ -118,7 +123,7 @@ export function TableSessionModal({
 
               <Text style={styles.sectionLabel}>اختر مدة الجلسة</Text>
 
-              {/* Mode buttons */}
+              {/* Mode buttons grid */}
               <View style={styles.modeGrid}>
                 {MODES.map((mode) => {
                   const isSelected = selected === mode;
@@ -126,28 +131,52 @@ export function TableSessionModal({
                   return (
                     <Pressable
                       key={mode}
-                      style={[
+                      style={({ pressed }) => [
                         styles.modeBtn,
                         isSelected
                           ? { backgroundColor: color, borderColor: color }
                           : { backgroundColor: Colors.card, borderColor: Colors.border },
+                        pressed && { opacity: 0.85 },
                       ]}
                       onPress={() => setSelected(mode)}
                     >
                       <MaterialIcons
                         name={MODE_ICONS[mode]}
-                        size={24}
+                        size={26}
                         color={isSelected ? Colors.white : color}
                       />
-                      <Text style={[styles.modeLabel, { color: isSelected ? Colors.white : Colors.textPrimary }]}>
+                      <Text
+                        style={[
+                          styles.modeLabel,
+                          { color: isSelected ? Colors.white : Colors.textPrimary },
+                        ]}
+                      >
                         {modeLabel(mode)}
                       </Text>
                       {previewCost !== null ? (
-                        <Text style={[styles.modeCost, { color: isSelected ? Colors.white + 'CC' : Colors.reports }]}>
+                        <Text
+                          style={[
+                            styles.modeCost,
+                            {
+                              color: isSelected
+                                ? Colors.white + 'CC'
+                                : Colors.reports,
+                            },
+                          ]}
+                        >
                           {previewCost.toLocaleString('ar-SA')} ر.ي
                         </Text>
                       ) : (
-                        <Text style={[styles.modeCost, { color: isSelected ? Colors.white + 'CC' : Colors.textMuted }]}>
+                        <Text
+                          style={[
+                            styles.modeCost,
+                            {
+                              color: isSelected
+                                ? Colors.white + 'CC'
+                                : Colors.textMuted,
+                            },
+                          ]}
+                        >
                           يُحسب لاحقاً
                         </Text>
                       )}
@@ -158,7 +187,15 @@ export function TableSessionModal({
 
               {/* Open time explanation */}
               {selected === 'open' ? (
-                <View style={[styles.openNote, { backgroundColor: Colors.statBlueDim, borderColor: Colors.statBlue + '30' }]}>
+                <View
+                  style={[
+                    styles.openNote,
+                    {
+                      backgroundColor: Colors.statBlueDim,
+                      borderColor: Colors.statBlue + '30',
+                    },
+                  ]}
+                >
                   <MaterialIcons name="info-outline" size={16} color={Colors.statBlue} />
                   <Text style={[styles.openNoteText, { color: Colors.statBlue }]}>
                     سيبدأ عداد تصاعدي يحسب التكلفة بدقة حتى تضغط "إيقاف" يدوياً.
@@ -166,11 +203,16 @@ export function TableSessionModal({
                 </View>
               ) : null}
 
-              {/* Summary */}
+              {/* Cost summary */}
               {selected && selected !== 'open' ? (
-                <View style={[styles.summary, { backgroundColor: color + '15', borderColor: color + '30' }]}>
+                <View
+                  style={[
+                    styles.summary,
+                    { backgroundColor: color + '15', borderColor: color + '30' },
+                  ]}
+                >
                   <Text style={[styles.summaryText, { color }]}>
-                    المدة: {modeLabel(selected)} — التكلفة الإجمالية: {calcPreviewCost(selected)?.toLocaleString('ar-SA')} ر.ي
+                    المدة: {modeLabel(selected)} — التكلفة: {calcPreviewCost(selected)?.toLocaleString('ar-SA')} ر.ي
                   </Text>
                 </View>
               ) : null}
@@ -180,7 +222,7 @@ export function TableSessionModal({
                 style={({ pressed }) => [
                   styles.startBtn,
                   { backgroundColor: selected ? color : Colors.border },
-                  pressed && selected && { opacity: 0.85 },
+                  pressed && selected ? { opacity: 0.85 } : {},
                 ]}
                 onPress={handleStart}
                 disabled={!selected}
@@ -189,7 +231,7 @@ export function TableSessionModal({
                 <Text style={styles.startBtnText}>بدء الجلسة</Text>
               </Pressable>
 
-              <View style={{ height: 20 }} />
+              <View style={{ height: 24 }} />
             </ScrollView>
           </Pressable>
         </KeyboardAvoidingView>

@@ -17,6 +17,11 @@ import { TableSettingsModal } from '@/components/feature/TableSettingsModal';
 import { SessionMode, GameType, GameSettings } from '@/services/tableGames';
 import { useAlert } from '@/template';
 
+const BILLIARDS_COLOR = '#F97316';
+const BILLIARDS_DIM = '#2D1500';
+const TT_COLOR = '#06B6D4';
+const TT_DIM = '#001E24';
+
 export default function OtherGamesScreen() {
   const insets = useSafeAreaInsets();
   const { sessions, settings, tick, startSession, stopSession, getActiveSession, updateSettings } = useTableGames();
@@ -47,7 +52,8 @@ export default function OtherGamesScreen() {
         sessionModal.tableId,
         sessionModal.tableNumber,
         sessionModal.gameType,
-        mode
+        mode,
+        customRate
       );
       setSessionModal(null);
     },
@@ -108,13 +114,13 @@ export default function OtherGamesScreen() {
         <View style={[styles.statChip, { backgroundColor: BILLIARDS_DIM, borderColor: BILLIARDS_COLOR + '40' }]}>
           <MaterialIcons name="sports-esports" size={14} color={BILLIARDS_COLOR} />
           <Text style={[styles.statChipText, { color: BILLIARDS_COLOR }]}>
-            {activeBilliards}/{billiardsCount} شغّالة
+            {activeBilliards}/{billiardsCount} بلياردو
           </Text>
         </View>
         <View style={[styles.statChip, { backgroundColor: TT_DIM, borderColor: TT_COLOR + '40' }]}>
           <MaterialIcons name="sports-tennis" size={14} color={TT_COLOR} />
           <Text style={[styles.statChipText, { color: TT_COLOR }]}>
-            {activeTT}/{ttCount} شغّالة
+            {activeTT}/{ttCount} تنس
           </Text>
         </View>
       </View>

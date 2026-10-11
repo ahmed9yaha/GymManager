@@ -19,9 +19,7 @@ import {
   loadSettings,
   saveSettings,
   modeDuration,
-  calcCost,
   calcRemainingSeconds,
-  calcElapsedSeconds,
 } from '@/services/tableGames';
 
 // Configure notification handler
@@ -38,8 +36,14 @@ Notifications.setNotificationHandler({
 interface TableGamesContextType {
   sessions: TableSession[];
   settings: GameSettings;
-  tick: number; // increments every second to drive UI re-renders
-  startSession: (tableId: string, tableNumber: number, gameType: GameType, mode: SessionMode) => Promise<void>;
+  tick: number;
+  startSession: (
+    tableId: string,
+    tableNumber: number,
+    gameType: GameType,
+    mode: SessionMode,
+    customRate?: number
+  ) => Promise<void>;
   stopSession: (tableId: string) => Promise<void>;
   getActiveSession: (tableId: string) => TableSession | undefined;
   updateSettings: (settings: GameSettings) => Promise<void>;
@@ -47,9 +51,13 @@ interface TableGamesContextType {
 
 export const TableGamesContext = createContext<TableGamesContextType | undefined>(undefined);
 
-async function requestNotifPermission() {
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status === 'granted';
+async function requestNotifPermission(): Promise<boolean> {
+  try {
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status === 'granted';
+  } catch {
+    return false;
+  }
 }
 
 async function scheduleEndNotif(session: TableSession): Promise<string | undefined> {
@@ -57,24 +65,31 @@ async function scheduleEndNotif(session: TableSession): Promise<string | undefin
   const granted = await requestNotifPermission();
   if (!granted) return undefined;
   const triggerSeconds = session.durationMinutes * 60;
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: '⏰ انتهى وقت الطاولة!',
-      body: `الطاولة ${session.tableNumber} — انتهت المدة المحددة`,
-      sound: true,
-      priority: Notifications.AndroidNotificationPriority.MAX,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: Math.max(1, triggerSeconds),
-    },
-  });
-  return id;
+  if (triggerSeconds < 1) return undefined;
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'انتهى وقت الطاولة!',
+        body: `الطاولة ${session.tableNumber} — انتهت المدة المحددة`,
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: triggerSeconds,
+      },
+    });
+    return id;
+  } catch {
+    return undefined;
+  }
 }
 
 async function cancelNotif(id?: string) {
   if (id) {
-    try { await Notifications.cancelScheduledNotificationAsync(id); } catch {}
+    try {
+      await Notifications.cancelScheduledNotificationAsync(id);
+    } catch {}
   }
 }
 
@@ -87,7 +102,8 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
   const [tick, setTick] = useState(0);
   const soundRef = useRef<Audio.Sound | null>(null);
   const alreadyAlerter = useRef<Set<string>>(new Set());
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   // Load initial data
   useEffect(() => {
@@ -98,12 +114,12 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  // Tick every second
+  // Tick every second to update timers in UI
   useEffect(() => {
-    tickRef.current = setInterval(() => {
+    const interval = setInterval(() => {
       setTick((t) => t + 1);
     }, 1000);
-    return () => { if (tickRef.current) clearInterval(tickRef.current); };
+    return () => clearInterval(interval);
   }, []);
 
   // Check for sessions that just ended → play alarm
@@ -117,16 +133,17 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
         playAlarm(session.gameType);
       }
     });
-  }, [tick]);
+  }, [tick, sessions]);
 
   const playAlarm = useCallback(async (gameType: GameType) => {
     try {
+      const currentSettings = settingsRef.current;
       const customUri = gameType === 'billiards'
-        ? settings.billiards.customSoundUri
-        : settings.tabletennis.customSoundUri;
+        ? currentSettings.billiards.customSoundUri
+        : currentSettings.tabletennis.customSoundUri;
 
       if (soundRef.current) {
-        await soundRef.current.unloadAsync();
+        try { await soundRef.current.unloadAsync(); } catch {}
         soundRef.current = null;
       }
 
@@ -137,27 +154,43 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
         soundRef.current = sound;
         await sound.playAsync();
       } else {
-        // No default sound file — trigger a local notification as audio cue
-        throw new Error('no_default_sound');
+        // Fallback: immediate notification as audio cue
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'انتهى وقت الطاولة!',
+            body: 'انتهت المدة المحددة للطاولة',
+            sound: true,
+          },
+          trigger: null,
+        });
       }
-    } catch (e) {
-      // Fallback: trigger local notification as audio cue
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '⏰ انتهى وقت الطاولة!',
-          body: 'انتهت المدة المحددة للطاولة',
-          sound: true,
-        },
-        trigger: null,
-      });
+    } catch {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'انتهى وقت الطاولة!',
+            body: 'انتهت المدة المحددة للطاولة',
+            sound: true,
+          },
+          trigger: null,
+        });
+      } catch {}
     }
-  }, [settings]);
+  }, []);
 
   const startSession = useCallback(
-    async (tableId: string, tableNumber: number, gameType: GameType, mode: SessionMode) => {
-      const hourlyRate = gameType === 'billiards'
-        ? settings.billiards.hourlyRate
-        : settings.tabletennis.hourlyRate;
+    async (
+      tableId: string,
+      tableNumber: number,
+      gameType: GameType,
+      mode: SessionMode,
+      customRate?: number
+    ) => {
+      const defaultRate = gameType === 'billiards'
+        ? settingsRef.current.billiards.hourlyRate
+        : settingsRef.current.tabletennis.hourlyRate;
+
+      const hourlyRate = (customRate && customRate > 0) ? customRate : defaultRate;
 
       const session: TableSession = {
         id: `${tableId}_${Date.now()}`,
@@ -175,16 +208,30 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
       if (notifId) session.notifId = notifId;
 
       setSessions((prev) => {
+        // Cancel notif for any existing active session on this table
+        const existingActive = prev.find((s) => s.tableId === tableId && s.isActive);
+        if (existingActive?.notifId) cancelNotif(existingActive.notifId);
+
         const filtered = prev.filter((s) => s.tableId !== tableId || !s.isActive);
         const updated = [session, ...filtered];
         persistSessions(updated);
         return updated;
       });
+
+      // Remove from already-alerted set so a new session can trigger again
+      alreadyAlerter.current.delete(session.id);
     },
-    [settings]
+    []
   );
 
   const stopSession = useCallback(async (tableId: string) => {
+    // Stop any playing sound
+    if (soundRef.current) {
+      try { await soundRef.current.stopAsync(); } catch {}
+      try { await soundRef.current.unloadAsync(); } catch {}
+      soundRef.current = null;
+    }
+
     setSessions((prev) => {
       const updated = prev.map((s) => {
         if (s.tableId === tableId && s.isActive) {
@@ -197,10 +244,6 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
       persistSessions(updated);
       return updated;
     });
-    // Stop any playing sound
-    if (soundRef.current) {
-      try { await soundRef.current.stopAsync(); } catch {}
-    }
   }, []);
 
   const getActiveSession = useCallback(

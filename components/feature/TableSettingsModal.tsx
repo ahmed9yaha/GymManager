@@ -18,6 +18,9 @@ import { Audio } from 'expo-av';
 import { GameSettings } from '@/services/tableGames';
 import { Colors, Radius, Spacing, FontSize } from '@/constants/theme';
 
+const BILLIARDS_COLOR = '#F97316';
+const TT_COLOR = '#06B6D4';
+
 interface TableSettingsModalProps {
   visible: boolean;
   settings: GameSettings;
@@ -25,7 +28,12 @@ interface TableSettingsModalProps {
   onSave: (settings: GameSettings) => void;
 }
 
-export function TableSettingsModal({ visible, settings, onClose, onSave }: TableSettingsModalProps) {
+export function TableSettingsModal({
+  visible,
+  settings,
+  onClose,
+  onSave,
+}: TableSettingsModalProps) {
   const [billiardsRate, setBilliardsRate] = useState('');
   const [billiardsCount, setBilliardsCount] = useState('');
   const [billiardsSound, setBilliardsSound] = useState<string | undefined>();
@@ -35,7 +43,7 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
   const [ttSound, setTtSound] = useState<string | undefined>();
 
   const [testingSound, setTestingSound] = useState<'billiards' | 'tabletennis' | null>(null);
-  const [soundRef, setSoundRef] = useState<Audio.Sound | null>(null);
+  const [activeSoundRef, setActiveSoundRef] = useState<Audio.Sound | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -59,27 +67,27 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
         if (type === 'billiards') setBilliardsSound(uri);
         else setTtSound(uri);
       }
-    } catch (e) {
-      console.error('Sound pick error:', e);
-    }
+    } catch {}
   };
 
   const testSound = async (type: 'billiards' | 'tabletennis') => {
+    if (testingSound) return;
     setTestingSound(type);
     try {
-      if (soundRef) {
-        await soundRef.unloadAsync();
-        setSoundRef(null);
+      if (activeSoundRef) {
+        try { await activeSoundRef.unloadAsync(); } catch {}
+        setActiveSoundRef(null);
       }
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
       const uri = type === 'billiards' ? billiardsSound : ttSound;
       if (uri) {
         const { sound } = await Audio.Sound.createAsync({ uri });
-        setSoundRef(sound);
+        setActiveSoundRef(sound);
         await sound.playAsync();
         sound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded && status.didJustFinish) {
             setTestingSound(null);
+            setActiveSoundRef(null);
           }
         });
       }
@@ -97,82 +105,34 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
     onSave({
       billiards: {
         hourlyRate: br > 0 ? br : settings.billiards.hourlyRate,
-        tableCount: bc > 0 ? bc : settings.billiards.tableCount,
+        tableCount: bc > 0 ? Math.min(bc, 20) : settings.billiards.tableCount,
         customSoundUri: billiardsSound,
       },
       tabletennis: {
         hourlyRate: tr > 0 ? tr : settings.tabletennis.hourlyRate,
-        tableCount: tc > 0 ? tc : settings.tabletennis.tableCount,
+        tableCount: tc > 0 ? Math.min(tc, 20) : settings.tabletennis.tableCount,
         customSoundUri: ttSound,
       },
     });
     onClose();
   };
 
-  const SoundRow = ({
-    type,
-    label,
-    color,
-    soundUri,
-    onPick,
-    onClear,
-  }: {
-    type: 'billiards' | 'tabletennis';
-    label: string;
-    color: string;
-    soundUri?: string;
-    onPick: () => void;
-    onClear: () => void;
-  }) => (
-    <View style={[styles.soundRow, { borderColor: color + '30' }]}>
-      <View style={styles.soundInfo}>
-        <Text style={styles.soundLabel}>{label}</Text>
-        <Text style={[styles.soundName, { color: soundUri ? Colors.reports : Colors.textMuted }]}>
-          {soundUri ? 'صوت مخصص محدد ✓' : 'الصوت الافتراضي (جرس)'}
-        </Text>
-      </View>
-      <View style={styles.soundBtns}>
-        {soundUri ? (
-          <Pressable
-            style={({ pressed }) => [styles.soundBtn, { backgroundColor: Colors.reportsDim, borderColor: Colors.reports + '40' }, pressed && { opacity: 0.7 }]}
-            onPress={() => testSound(type)}
-          >
-            {testingSound === type ? (
-              <ActivityIndicator size="small" color={Colors.reports} />
-            ) : (
-              <MaterialIcons name="volume-up" size={16} color={Colors.reports} />
-            )}
-          </Pressable>
-        ) : null}
-        {soundUri ? (
-          <Pressable
-            style={({ pressed }) => [styles.soundBtn, { backgroundColor: Colors.statRedDim, borderColor: Colors.danger + '40' }, pressed && { opacity: 0.7 }]}
-            onPress={onClear}
-          >
-            <MaterialIcons name="close" size={16} color={Colors.danger} />
-          </Pressable>
-        ) : null}
-        <Pressable
-          style={({ pressed }) => [styles.soundBtn, { backgroundColor: color + '20', borderColor: color + '40' }, pressed && { opacity: 0.7 }]}
-          onPress={onPick}
-        >
-          <MaterialIcons name="audio-file" size={16} color={color} />
-        </Pressable>
-      </View>
-    </View>
-  );
-
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.avoidWrap}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.avoidWrap}
+        >
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={[styles.strip, { backgroundColor: Colors.reports }]} />
 
             <View style={styles.header}>
               <View>
                 <Text style={styles.title}>إعدادات الألعاب</Text>
-                <Text style={[styles.subtitle, { color: Colors.reports }]}>الأسعار والصوت</Text>
+                <Text style={[styles.subtitle, { color: Colors.reports }]}>
+                  الأسعار، الطاولات، والصوت
+                </Text>
               </View>
               <Pressable onPress={onClose} style={styles.closeBtn}>
                 <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
@@ -181,17 +141,20 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
 
             <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
 
-              {/* Billiards */}
-              <View style={[styles.section, { borderColor: '#F97316' + '30' }]}>
+              {/* Billiards Section */}
+              <View style={[styles.section, { borderColor: BILLIARDS_COLOR + '30' }]}>
                 <View style={styles.sectionHeader}>
-                  <MaterialIcons name="sports-esports" size={20} color="#F97316" />
-                  <Text style={[styles.sectionTitle, { color: '#F97316' }]}>البلياردو</Text>
+                  <View style={[styles.sectionIconWrap, { backgroundColor: BILLIARDS_COLOR + '20' }]}>
+                    <MaterialIcons name="sports-esports" size={18} color={BILLIARDS_COLOR} />
+                  </View>
+                  <Text style={[styles.sectionTitle, { color: BILLIARDS_COLOR }]}>البلياردو</Text>
                 </View>
+
                 <View style={styles.inputRow}>
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>سعر الساعة (ر.ي)</Text>
                     <TextInput
-                      style={[styles.input, { borderColor: '#F97316' + '40' }]}
+                      style={[styles.input, { borderColor: BILLIARDS_COLOR + '40' }]}
                       value={billiardsRate}
                       onChangeText={setBilliardsRate}
                       keyboardType="numeric"
@@ -203,7 +166,7 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>عدد الطاولات</Text>
                     <TextInput
-                      style={[styles.input, { borderColor: '#F97316' + '40' }]}
+                      style={[styles.input, { borderColor: BILLIARDS_COLOR + '40' }]}
                       value={billiardsCount}
                       onChangeText={setBilliardsCount}
                       keyboardType="numeric"
@@ -213,27 +176,77 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
                     />
                   </View>
                 </View>
-                <SoundRow
-                  type="billiards"
-                  label="صوت التنبيه"
-                  color="#F97316"
-                  soundUri={billiardsSound}
-                  onPick={() => pickSound('billiards')}
-                  onClear={() => setBilliardsSound(undefined)}
-                />
+
+                {/* Sound row */}
+                <View style={[styles.soundRow, { borderColor: BILLIARDS_COLOR + '30' }]}>
+                  <View style={styles.soundInfo}>
+                    <Text style={styles.soundLabel}>صوت التنبيه</Text>
+                    <Text
+                      style={[
+                        styles.soundName,
+                        { color: billiardsSound ? Colors.reports : Colors.textMuted },
+                      ]}
+                    >
+                      {billiardsSound ? 'صوت مخصص محدد ✓' : 'الصوت الافتراضي (إشعار)'}
+                    </Text>
+                  </View>
+                  <View style={styles.soundBtns}>
+                    {billiardsSound ? (
+                      <>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.soundBtn,
+                            { backgroundColor: Colors.reportsDim, borderColor: Colors.reports + '40' },
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPress={() => testSound('billiards')}
+                        >
+                          {testingSound === 'billiards' ? (
+                            <ActivityIndicator size="small" color={Colors.reports} />
+                          ) : (
+                            <MaterialIcons name="volume-up" size={16} color={Colors.reports} />
+                          )}
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.soundBtn,
+                            { backgroundColor: Colors.statRedDim, borderColor: Colors.danger + '40' },
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPress={() => setBilliardsSound(undefined)}
+                        >
+                          <MaterialIcons name="close" size={16} color={Colors.danger} />
+                        </Pressable>
+                      </>
+                    ) : null}
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.soundBtn,
+                        { backgroundColor: BILLIARDS_COLOR + '20', borderColor: BILLIARDS_COLOR + '40' },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                      onPress={() => pickSound('billiards')}
+                    >
+                      <MaterialIcons name="audio-file" size={16} color={BILLIARDS_COLOR} />
+                    </Pressable>
+                  </View>
+                </View>
               </View>
 
-              {/* Table Tennis */}
-              <View style={[styles.section, { borderColor: '#06B6D4' + '30' }]}>
+              {/* Table Tennis Section */}
+              <View style={[styles.section, { borderColor: TT_COLOR + '30' }]}>
                 <View style={styles.sectionHeader}>
-                  <MaterialIcons name="sports-tennis" size={20} color="#06B6D4" />
-                  <Text style={[styles.sectionTitle, { color: '#06B6D4' }]}>تنس الطاولة</Text>
+                  <View style={[styles.sectionIconWrap, { backgroundColor: TT_COLOR + '20' }]}>
+                    <MaterialIcons name="sports-tennis" size={18} color={TT_COLOR} />
+                  </View>
+                  <Text style={[styles.sectionTitle, { color: TT_COLOR }]}>تنس الطاولة</Text>
                 </View>
+
                 <View style={styles.inputRow}>
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>سعر الساعة (ر.ي)</Text>
                     <TextInput
-                      style={[styles.input, { borderColor: '#06B6D4' + '40' }]}
+                      style={[styles.input, { borderColor: TT_COLOR + '40' }]}
                       value={ttRate}
                       onChangeText={setTtRate}
                       keyboardType="numeric"
@@ -245,7 +258,7 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>عدد الطاولات</Text>
                     <TextInput
-                      style={[styles.input, { borderColor: '#06B6D4' + '40' }]}
+                      style={[styles.input, { borderColor: TT_COLOR + '40' }]}
                       value={ttCount}
                       onChangeText={setTtCount}
                       keyboardType="numeric"
@@ -255,14 +268,61 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
                     />
                   </View>
                 </View>
-                <SoundRow
-                  type="tabletennis"
-                  label="صوت التنبيه"
-                  color="#06B6D4"
-                  soundUri={ttSound}
-                  onPick={() => pickSound('tabletennis')}
-                  onClear={() => setTtSound(undefined)}
-                />
+
+                {/* Sound row */}
+                <View style={[styles.soundRow, { borderColor: TT_COLOR + '30' }]}>
+                  <View style={styles.soundInfo}>
+                    <Text style={styles.soundLabel}>صوت التنبيه</Text>
+                    <Text
+                      style={[
+                        styles.soundName,
+                        { color: ttSound ? Colors.reports : Colors.textMuted },
+                      ]}
+                    >
+                      {ttSound ? 'صوت مخصص محدد ✓' : 'الصوت الافتراضي (إشعار)'}
+                    </Text>
+                  </View>
+                  <View style={styles.soundBtns}>
+                    {ttSound ? (
+                      <>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.soundBtn,
+                            { backgroundColor: Colors.reportsDim, borderColor: Colors.reports + '40' },
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPress={() => testSound('tabletennis')}
+                        >
+                          {testingSound === 'tabletennis' ? (
+                            <ActivityIndicator size="small" color={Colors.reports} />
+                          ) : (
+                            <MaterialIcons name="volume-up" size={16} color={Colors.reports} />
+                          )}
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.soundBtn,
+                            { backgroundColor: Colors.statRedDim, borderColor: Colors.danger + '40' },
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPress={() => setTtSound(undefined)}
+                        >
+                          <MaterialIcons name="close" size={16} color={Colors.danger} />
+                        </Pressable>
+                      </>
+                    ) : null}
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.soundBtn,
+                        { backgroundColor: TT_COLOR + '20', borderColor: TT_COLOR + '40' },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                      onPress={() => pickSound('tabletennis')}
+                    >
+                      <MaterialIcons name="audio-file" size={16} color={TT_COLOR} />
+                    </Pressable>
+                  </View>
+                </View>
               </View>
 
               <Pressable
@@ -273,7 +333,7 @@ export function TableSettingsModal({ visible, settings, onClose, onSave }: Table
                 <Text style={styles.saveBtnText}>حفظ الإعدادات</Text>
               </Pressable>
 
-              <View style={{ height: 24 }} />
+              <View style={{ height: 28 }} />
             </ScrollView>
           </Pressable>
         </KeyboardAvoidingView>
@@ -335,6 +395,13 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.lg,
   },
+  sectionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sectionTitle: {
     fontSize: FontSize.md,
     fontWeight: '700',
@@ -373,6 +440,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: Spacing.md,
     gap: Spacing.md,
+    marginTop: Spacing.xs,
   },
   soundInfo: {
     flex: 1,
