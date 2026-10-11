@@ -11,6 +11,7 @@ import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import {
   TableSession,
+  SessionRecord,
   GameSettings,
   GameType,
   SessionMode,
@@ -18,8 +19,12 @@ import {
   persistSessions,
   loadSettings,
   saveSettings,
+  loadRecords,
+  appendRecord,
   modeDuration,
   calcRemainingSeconds,
+  calcCost,
+  calcElapsedSeconds,
 } from '@/services/tableGames';
 
 // Configure notification handler
@@ -33,8 +38,20 @@ Notifications.setNotificationHandler({
   }),
 });
 
+export interface ReportData {
+  totalCost: number;
+  totalSessions: number;
+  totalMinutes: number;
+  billiardsCost: number;
+  billiardsCount: number;
+  ttCost: number;
+  ttCount: number;
+  records: SessionRecord[];
+}
+
 interface TableGamesContextType {
   sessions: TableSession[];
+  records: SessionRecord[];
   settings: GameSettings;
   tick: number;
   startSession: (
@@ -44,8 +61,10 @@ interface TableGamesContextType {
     mode: SessionMode,
     customRate?: number
   ) => Promise<void>;
-  stopSession: (tableId: string) => Promise<void>;
+  stopSession: (tableId: string, finalCost?: number) => Promise<void>;
   getActiveSession: (tableId: string) => TableSession | undefined;
+  calcFinalCost: (tableId: string) => number;
+  getReport: (from: Date, to: Date) => ReportData;
   updateSettings: (settings: GameSettings) => Promise<void>;
 }
 
@@ -95,6 +114,7 @@ async function cancelNotif(id?: string) {
 
 export function TableGamesProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<TableSession[]>([]);
+  const [records, setRecords] = useState<SessionRecord[]>([]);
   const [settings, setSettings] = useState<GameSettings>({
     billiards: { hourlyRate: 1000, tableCount: 4 },
     tabletennis: { hourlyRate: 500, tableCount: 3 },
@@ -108,9 +128,10 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
   // Load initial data
   useEffect(() => {
     (async () => {
-      const [s, g] = await Promise.all([loadSessions(), loadSettings()]);
+      const [s, g, r] = await Promise.all([loadSessions(), loadSettings(), loadRecords()]);
       setSessions(s);
       setSettings(g);
+      setRecords(r);
     })();
   }, []);
 
@@ -224,7 +245,13 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const stopSession = useCallback(async (tableId: string) => {
+  const calcFinalCost = useCallback((tableId: string): number => {
+    const session = sessions.find((s) => s.tableId === tableId && s.isActive);
+    if (!session) return 0;
+    return calcCost(session, Date.now());
+  }, [sessions]);
+
+  const stopSession = useCallback(async (tableId: string, finalCost?: number) => {
     // Stop any playing sound
     if (soundRef.current) {
       try { await soundRef.current.stopAsync(); } catch {}
@@ -232,23 +259,80 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
       soundRef.current = null;
     }
 
+    const endTime = new Date().toISOString();
+    const nowMs = Date.now();
+
     setSessions((prev) => {
       const updated = prev.map((s) => {
         if (s.tableId === tableId && s.isActive) {
           cancelNotif(s.notifId);
           alreadyAlerter.current.delete(s.id);
-          return { ...s, isActive: false, endTime: new Date().toISOString() };
+          // Build and save a record
+          const cost = finalCost !== undefined ? finalCost : calcCost(s, nowMs);
+          const elapsedMins = Math.ceil(calcElapsedSeconds(s, nowMs) / 60);
+          const record: SessionRecord = {
+            id: s.id,
+            tableId: s.tableId,
+            tableNumber: s.tableNumber,
+            gameType: s.gameType,
+            mode: s.mode,
+            startTime: s.startTime,
+            endTime,
+            durationMinutes: s.mode === 'open' ? elapsedMins : s.durationMinutes,
+            hourlyRate: s.hourlyRate,
+            finalCost: cost,
+          };
+          appendRecord(record).then(() => {
+            setRecords((r) => [record, ...r].slice(0, 500));
+          });
+          return { ...s, isActive: false, endTime };
         }
         return s;
       });
       persistSessions(updated);
       return updated;
     });
-  }, []);
+  }, [sessions]);
 
   const getActiveSession = useCallback(
     (tableId: string) => sessions.find((s) => s.tableId === tableId && s.isActive),
     [sessions]
+  );
+
+  const getReport = useCallback(
+    (from: Date, to: Date): ReportData => {
+      const fromMs = from.getTime();
+      const toMs = to.getTime();
+      const filtered = records.filter((r) => {
+        const t = new Date(r.endTime).getTime();
+        return t >= fromMs && t <= toMs;
+      });
+      let totalCost = 0, totalMinutes = 0;
+      let billiardsCost = 0, billiardsCount = 0;
+      let ttCost = 0, ttCount = 0;
+      filtered.forEach((r) => {
+        totalCost += r.finalCost;
+        totalMinutes += r.durationMinutes;
+        if (r.gameType === 'billiards') {
+          billiardsCost += r.finalCost;
+          billiardsCount++;
+        } else {
+          ttCost += r.finalCost;
+          ttCount++;
+        }
+      });
+      return {
+        totalCost,
+        totalSessions: filtered.length,
+        totalMinutes,
+        billiardsCost,
+        billiardsCount,
+        ttCost,
+        ttCount,
+        records: filtered,
+      };
+    },
+    [records]
   );
 
   const updateSettings = useCallback(async (newSettings: GameSettings) => {
@@ -258,7 +342,7 @@ export function TableGamesProvider({ children }: { children: ReactNode }) {
 
   return (
     <TableGamesContext.Provider
-      value={{ sessions, settings, tick, startSession, stopSession, getActiveSession, updateSettings }}
+      value={{ sessions, records, settings, tick, startSession, stopSession, getActiveSession, calcFinalCost, getReport, updateSettings }}
     >
       {children}
     </TableGamesContext.Provider>

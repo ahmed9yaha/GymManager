@@ -31,9 +31,25 @@ export interface GameSettings {
   };
 }
 
+// ── Session Record (closed sessions for reports) ─────────────────────────────
+
+export interface SessionRecord {
+  id: string;
+  tableId: string;
+  tableNumber: number;
+  gameType: GameType;
+  mode: SessionMode;
+  startTime: string;  // ISO
+  endTime: string;    // ISO
+  durationMinutes: number;
+  hourlyRate: number;
+  finalCost: number;
+}
+
 const KEYS = {
   sessions: 'table_games_sessions_v2',
   settings: 'table_games_settings_v2',
+  records: 'table_games_records_v1',
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -60,6 +76,35 @@ export async function loadSettings(): Promise<GameSettings> {
 export async function saveSettings(settings: GameSettings): Promise<void> {
   try {
     await AsyncStorage.setItem(KEYS.settings, JSON.stringify(settings));
+  } catch {}
+}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+
+// ── Records ──────────────────────────────────────────────────────────────────
+
+export async function loadRecords(): Promise<SessionRecord[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.records);
+    if (!raw) return [];
+    return JSON.parse(raw) as SessionRecord[];
+  } catch {
+    return [];
+  }
+}
+
+export async function persistRecords(records: SessionRecord[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(KEYS.records, JSON.stringify(records));
+  } catch {}
+}
+
+export async function appendRecord(record: SessionRecord): Promise<void> {
+  try {
+    const existing = await loadRecords();
+    // keep last 500 records to avoid unbounded growth
+    const updated = [record, ...existing].slice(0, 500);
+    await persistRecords(updated);
   } catch {}
 }
 

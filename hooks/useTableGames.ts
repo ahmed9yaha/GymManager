@@ -1,6 +1,8 @@
 // Powered by OnSpace.AI
 import { useContext } from 'react';
-import { TableGamesContext } from '@/contexts/TableGamesContext';
+import { TableGamesContext, ReportData } from '@/contexts/TableGamesContext';
+
+export type { ReportData };
 
 export function useTableGames() {
   const ctx = useContext(TableGamesContext);
