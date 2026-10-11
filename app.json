@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "GymManager",
+    "slug": "GymManager",
+    "version": "1.0.0",
+    "android": {
+      "package": "com.ahmed9yaha.gymmanager"
+    }
+  }
+}
