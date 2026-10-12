@@ -36,5 +36,8 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Install EAS CLI Globally
+        run: pnpm add -g eas-cli
+
       - name: Build APK
-        run: pnpm eas build --platform android --profile preview --local
+        run: eas build --platform android --profile preview --local
