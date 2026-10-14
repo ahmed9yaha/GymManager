@@ -9,6 +9,9 @@ import {
   Modal,
   TextInput,
   Platform,
+  Share,
+  Clipboard,
+  ToastAndroid,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -17,7 +20,7 @@ import { useTableGames } from '@/hooks/useTableGames';
 import { TableCard } from '@/components/feature/TableCard';
 import { TableSessionModal } from '@/components/feature/TableSessionModal';
 import { TableSettingsModal } from '@/components/feature/TableSettingsModal';
-import { SessionMode, GameType, GameSettings } from '@/services/tableGames';
+import { SessionMode, GameType, GameSettings, SessionRecord } from '@/services/tableGames';
 
 const BILLIARDS_COLOR = '#F97316';
 const BILLIARDS_DIM = '#2D1500';
@@ -51,6 +54,163 @@ function parseDateISO(s: string): Date | null {
   if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
   return new Date(y, m, d);
 }
+
+// ── Export helpers ────────────────────────────────────────────────────────────
+
+interface ReportData {
+  totalCost: number;
+  totalSessions: number;
+  totalMinutes: number;
+  billiardsCost: number;
+  billiardsCount: number;
+  ttCost: number;
+  ttCount: number;
+  records: SessionRecord[];
+}
+
+function buildExportText(label: string, data: ReportData): string {
+  const totalHours = data.totalMinutes >= 60
+    ? `${Math.floor(data.totalMinutes / 60)} ساعة ${data.totalMinutes % 60} دقيقة`
+    : `${data.totalMinutes} دقيقة`;
+
+  const lines: string[] = [
+    '━━━━━━━━━━━━━━━━━━━━━━━━',
+    '🎱  تقرير الألعاب الأخرى',
+    `📅  الفترة: ${label}`,
+    '━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    `💰  إجمالي الأرباح: ${data.totalCost.toLocaleString('ar-SA')} ريال يمني`,
+    `📊  عدد الجلسات:    ${data.totalSessions} جلسة`,
+    `⏱️  إجمالي الوقت:   ${totalHours}`,
+    '',
+    '── تفصيل الألعاب ──',
+    `🎱  البلياردو:`,
+    `    • جلسات: ${data.billiardsCount}`,
+    `    • أرباح: ${data.billiardsCost.toLocaleString('ar-SA')} ر.ي`,
+    `🏓  تنس الطاولة:`,
+    `    • جلسات: ${data.ttCount}`,
+    `    • أرباح: ${data.ttCost.toLocaleString('ar-SA')} ر.ي`,
+    '',
+  ];
+
+  if (data.records.length > 0) {
+    lines.push('── سجل الجلسات ──');
+    data.records.forEach((r, idx) => {
+      const gameName = r.gameType === 'billiards' ? 'بلياردو' : 'تنس';
+      const start = new Date(r.startTime).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      const end = new Date(r.endTime).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      lines.push(`${idx + 1}. ${gameName} - طاولة ${r.tableNumber}  |  ${start} ← ${end}  |  ${r.finalCost.toLocaleString('ar-SA')} ر.ي`);
+    });
+    lines.push('');
+  }
+
+  lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
+  lines.push('تطوير المبرمج: أحمد شرف');
+  return lines.join('\n');
+}
+
+async function shareText(text: string) {
+  try {
+    await Share.share({ message: text });
+  } catch {}
+}
+
+function copyToClipboard(text: string) {
+  Clipboard.setString(text);
+  if (Platform.OS === 'android') {
+    ToastAndroid.show('تم النسخ إلى الحافظة ✓', ToastAndroid.SHORT);
+  }
+}
+
+// ── Export Bar ────────────────────────────────────────────────────────────────
+
+interface ExportBarProps {
+  text: string;
+}
+
+function ExportBar({ text }: ExportBarProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    copyToClipboard(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <View style={exStyles.bar}>
+      <Pressable
+        style={({ pressed }) => [exStyles.btn, exStyles.shareBtn, pressed && { opacity: 0.8 }]}
+        onPress={() => shareText(text)}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      >
+        <MaterialIcons name="share" size={16} color="#fff" />
+        <Text style={exStyles.shareBtnText}>مشاركة (واتساب...)</Text>
+      </Pressable>
+
+      <Pressable
+        style={({ pressed }) => [
+          exStyles.btn,
+          exStyles.copyBtn,
+          copied && exStyles.copiedBtn,
+          pressed && { opacity: 0.8 },
+        ]}
+        onPress={handleCopy}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      >
+        <MaterialIcons
+          name={copied ? 'check' : 'content-copy'}
+          size={16}
+          color={copied ? '#fff' : Colors.textPrimary}
+        />
+        <Text style={[exStyles.copyBtnText, copied && { color: '#fff' }]}>
+          {copied ? 'تم النسخ' : 'نسخ'}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const exStyles = StyleSheet.create({
+  bar: {
+    flexDirection: 'row-reverse',
+    gap: Spacing.sm,
+  },
+  btn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  shareBtn: {
+    flex: 1.6,
+    backgroundColor: '#25D366',
+    borderColor: '#25D366',
+  },
+  shareBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  copyBtn: {
+    flex: 1,
+    backgroundColor: Colors.card,
+    borderColor: Colors.border,
+  },
+  copiedBtn: {
+    backgroundColor: Colors.reports,
+    borderColor: Colors.reports,
+  },
+  copyBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+});
 
 // ── Stop Confirmation Modal ──────────────────────────────────────────────────
 
@@ -415,7 +575,7 @@ interface ReportPanelProps {
   label: string;
   from: Date;
   to: Date;
-  getReport: (from: Date, to: Date) => ReturnType<ReturnType<typeof useTableGames>['getReport']>;
+  getReport: (from: Date, to: Date) => ReportData;
 }
 
 function ReportPanel({ label, from, to, getReport }: ReportPanelProps) {
@@ -424,6 +584,8 @@ function ReportPanel({ label, from, to, getReport }: ReportPanelProps) {
   const totalHours = data.totalMinutes >= 60
     ? `${Math.floor(data.totalMinutes / 60)}س ${data.totalMinutes % 60}د`
     : `${data.totalMinutes}د`;
+
+  const exportText = useMemo(() => buildExportText(label, data), [label, data]);
 
   return (
     <View style={rpStyles.container}>
@@ -439,6 +601,11 @@ function ReportPanel({ label, from, to, getReport }: ReportPanelProps) {
         </View>
       ) : (
         <>
+          {/* Export bar */}
+          <ExportBar text={exportText} />
+
+          <View style={rpStyles.divider} />
+
           {/* Total Revenue */}
           <View style={[rpStyles.totalCard, { borderColor: Colors.reports + '40' }]}>
             <View style={rpStyles.totalLeft}>
@@ -519,6 +686,11 @@ const rpStyles = StyleSheet.create({
     color: Colors.textSecondary,
     flex: 1,
     textAlign: 'right',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 2,
   },
   emptyWrap: {
     alignItems: 'center',
@@ -887,7 +1059,7 @@ export default function OtherGamesScreen() {
             />
           ) : customRange ? (
             <ReportPanel
-              label={`${formatDateISO(customRange.from)} → ${formatDateISO(customRange.to)}`}
+              label={`${formatDateISO(customRange.from)} - ${formatDateISO(customRange.to)}`}
               from={customRange.from}
               to={customRange.to}
               getReport={getReport}
